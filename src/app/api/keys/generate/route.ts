@@ -1,58 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { License } from "@/lib/models/License";
-import { generateKey } from "@/lib/keygen";
 
-// Rate-limit: max 3 keys per IP per hour (in-memory, resets on restart)
-const ipLimits = new Map<string, { count: number; resetAt: number }>();
-const MAX_PER_HOUR = 3;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = ipLimits.get(ip);
-  if (!entry || now > entry.resetAt) {
-    ipLimits.set(ip, { count: 1, resetAt: now + 3600000 });
-    return true;
-  }
-  if (entry.count >= MAX_PER_HOUR) return false;
-  entry.count++;
-  return true;
-}
-
-// POST — public key generation (no auth, free demo)
+// POST — public key generation (no auth, unlimited, custom key name)
 export async function POST(req: NextRequest) {
   try {
-    const ip =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      req.headers.get("x-real-ip") ||
-      "unknown";
+    await connectDB();
 
-    if (!checkRateLimit(ip)) {
+    const body = await req.json().catch(() => ({}));
+    const customKey = (body.key || "").trim().toUpperCase();
+
+    if (!customKey) {
       return NextResponse.json(
-        { error: "Rate limit exceeded. Max 3 keys per hour." },
-        { status: 429 }
+        { error: "Please enter a key name." },
+        { status: 400 }
       );
     }
 
-    await connectDB();
+    // Must be at least 6 chars so final key (NASA-XXXXXX) is > 10 chars
+    // which is required for the desktop app to detect it
+    if (customKey.length < 6 || customKey.length > 50) {
+      return NextResponse.json(
+        { error: "Key must be between 6 and 50 characters." },
+        { status: 400 }
+      );
+    }
 
-    const key = generateKey();
+    // Format the key: add NASA- prefix if not present
+    let finalKey = customKey;
+    if (!finalKey.startsWith("NASA-")) {
+      finalKey = "NASA-" + finalKey;
+    }
+
+    // Check if key already exists
+    const existing = await License.findOne({ key: finalKey });
+    if (existing) {
+      return NextResponse.json(
+        { error: `Key "${finalKey}" already exists. Choose a different name.` },
+        { status: 409 }
+      );
+    }
 
     await License.create({
-      key,
+      key: finalKey,
       status: "active",
       tier: "basic",
-      notes: "FREE_DEMO",
-      expiresAt: new Date(Date.now() + 7 * 86400000), // 7 days expiry
+      notes: "GENERATED",
+      expiresAt: null,
       createdBy: null,
       approvedBy: null,
     });
 
     return NextResponse.json({
       success: true,
-      key,
-      expiresIn: "7 days",
-      message: "Your free demo key has been generated!",
+      key: finalKey,
+      message: "Key generated successfully!",
     });
   } catch (err: any) {
     console.error("Key generate error:", err);

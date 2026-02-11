@@ -4,27 +4,35 @@ import { useState } from "react";
 import Link from "next/link";
 
 export default function GeneratePublicPage() {
-  const [key, setKey] = useState("");
-  const [expiresIn, setExpiresIn] = useState("");
+  const [keyInput, setKeyInput] = useState("");
+  const [generatedKey, setGeneratedKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
   const generateKey = async () => {
+    if (!keyInput.trim()) {
+      setError("Enter a key name first.");
+      return;
+    }
+
     setLoading(true);
     setError("");
-    setKey("");
+    setGeneratedKey("");
     setCopied(false);
 
     try {
-      const res = await fetch("/api/keys/generate", { method: "POST" });
+      const res = await fetch("/api/keys/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: keyInput.trim() }),
+      });
       const data = await res.json();
 
       if (!res.ok) {
         setError(data.error || "Failed to generate key");
       } else {
-        setKey(data.key);
-        setExpiresIn(data.expiresIn || "7 days");
+        setGeneratedKey(data.key);
       }
     } catch {
       setError("Network error. Please try again.");
@@ -33,10 +41,14 @@ export default function GeneratePublicPage() {
   };
 
   const copyKey = () => {
-    if (!key) return;
-    navigator.clipboard.writeText(key);
+    if (!generatedKey) return;
+    navigator.clipboard.writeText(generatedKey);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !loading) generateKey();
   };
 
   return (
@@ -65,17 +77,16 @@ export default function GeneratePublicPage() {
             </svg>
           </div>
           <h1 className="text-4xl font-bold text-white tracking-wider">NASA</h1>
-          <p className="text-[#7B8FB5] mt-2 text-sm tracking-widest uppercase">Free Access Key</p>
+          <p className="text-[#7B8FB5] mt-2 text-sm tracking-widest uppercase">Generate Access Key</p>
         </div>
 
         {/* Main card */}
         <div className="bg-[#111B33]/80 backdrop-blur-sm rounded-2xl border border-[#1C2B4A] p-8">
-          {!key ? (
+          {!generatedKey ? (
             <>
               <p className="text-center text-[#7B8FB5] text-sm mb-6 leading-relaxed">
-                Generate a free demo access key to try NASA Control. 
-                Keys are valid for <span className="text-[#2B7AE8] font-medium">7 days</span> and 
-                limited to <span className="text-[#2B7AE8] font-medium">3 per hour</span>.
+                Enter a custom key name below. The <span className="text-[#2B7AE8] font-medium">NASA-</span> prefix
+                will be added automatically.
               </p>
 
               {error && (
@@ -84,10 +95,35 @@ export default function GeneratePublicPage() {
                 </div>
               )}
 
+              {/* Key input */}
+              <div className="mb-5">
+                <div className="flex items-center bg-[#0B1026] border border-[#1C2B4A] rounded-xl overflow-hidden focus-within:border-[#105BD8]/50 transition">
+                  <span className="px-4 py-4 text-[#2B7AE8] font-mono font-bold text-lg bg-[#0B1026] select-none border-r border-[#1C2B4A]">
+                    NASA-
+                  </span>
+                  <input
+                    type="text"
+                    value={keyInput}
+                    onChange={(e) => {
+                      setKeyInput(e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, ""));
+                      setError("");
+                    }}
+                    onKeyDown={handleKeyDown}
+                    placeholder="YOUR-KEY-NAME"
+                    className="flex-1 bg-transparent px-4 py-4 text-white font-mono text-lg tracking-widest placeholder:text-[#3A4A6A] outline-none"
+                    maxLength={45}
+                    autoFocus
+                  />
+                </div>
+                <p className="text-[#3A4A6A] text-xs mt-2 text-center">
+                  Min 6 characters. Letters, numbers, and dashes only.
+                </p>
+              </div>
+
               <button
                 onClick={generateKey}
-                disabled={loading}
-                className="w-full py-4 bg-gradient-to-r from-[#105BD8] to-[#2B7AE8] hover:from-[#2B7AE8] hover:to-[#105BD8] text-white font-bold text-lg rounded-xl transition-all duration-300 disabled:opacity-50 tracking-wide shadow-lg shadow-[#105BD8]/25 hover:shadow-[#105BD8]/40 active:scale-[0.98]"
+                disabled={loading || keyInput.trim().length < 6}
+                className="w-full py-4 bg-gradient-to-r from-[#105BD8] to-[#2B7AE8] hover:from-[#2B7AE8] hover:to-[#105BD8] text-white font-bold text-lg rounded-xl transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed tracking-wide shadow-lg shadow-[#105BD8]/25 hover:shadow-[#105BD8]/40 active:scale-[0.98]"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -98,7 +134,7 @@ export default function GeneratePublicPage() {
                     GENERATING...
                   </span>
                 ) : (
-                  "GENERATE ACCESS KEY"
+                  "GENERATE KEY"
                 )}
               </button>
             </>
@@ -112,7 +148,7 @@ export default function GeneratePublicPage() {
                   </svg>
                 </div>
                 <h2 className="text-lg font-bold text-white">Key Generated!</h2>
-                <p className="text-[#7B8FB5] text-xs mt-1">Expires in {expiresIn}</p>
+                <p className="text-[#7B8FB5] text-xs mt-1">Lifetime access &mdash; no expiry</p>
               </div>
 
               {/* Key display */}
@@ -121,7 +157,7 @@ export default function GeneratePublicPage() {
                 className="relative group cursor-pointer bg-[#0B1026] border border-[#1C2B4A] rounded-xl p-5 mb-5 hover:border-[#105BD8]/50 transition"
               >
                 <p className="text-center font-mono text-xl text-[#2B7AE8] font-bold tracking-widest select-all break-all">
-                  {key}
+                  {generatedKey}
                 </p>
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
                   <span className="text-xs text-[#7B8FB5] bg-[#1C2B4A] px-2 py-1 rounded">
@@ -133,8 +169,8 @@ export default function GeneratePublicPage() {
               {/* Instructions */}
               <div className="bg-[#0B1026]/50 rounded-lg p-4 mb-5 border border-[#1C2B4A]/50">
                 <p className="text-xs text-[#7B8FB5] leading-relaxed">
-                  <span className="text-white font-medium">How to use:</span> Open the NASA desktop app, 
-                  paste this key in the license field, and press Enter. The key binds to your 
+                  <span className="text-white font-medium">How to use:</span> Open the NASA desktop app,
+                  paste this key in the license field, and press Enter. The key binds to your
                   device on first use.
                 </p>
               </div>
@@ -148,7 +184,7 @@ export default function GeneratePublicPage() {
                   {copied ? "COPIED!" : "COPY KEY"}
                 </button>
                 <button
-                  onClick={() => { setKey(""); setError(""); setCopied(false); }}
+                  onClick={() => { setGeneratedKey(""); setKeyInput(""); setError(""); setCopied(false); }}
                   className="px-5 py-3 bg-[#1C2B4A] hover:bg-[#2D3B5A] text-[#7B8FB5] hover:text-white rounded-xl transition text-sm"
                 >
                   New Key

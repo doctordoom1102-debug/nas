@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 export default function SettingsPage() {
     const [setupLink, setSetupLink] = useState("");
     const [updaterLink, setUpdaterLink] = useState("");
+    const [whatsappLink, setWhatsappLink] = useState("");
+    const [telegramLink, setTelegramLink] = useState("");
     const [generatePageEnabled, setGeneratePageEnabled] = useState(true);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -15,6 +17,8 @@ export default function SettingsPage() {
             .then((data) => {
                 setSetupLink(data.settings?.download_setup || "");
                 setUpdaterLink(data.settings?.download_updater || "");
+                setWhatsappLink(data.settings?.whatsapp_link || "");
+                setTelegramLink(data.settings?.telegram_link || "");
                 setGeneratePageEnabled(data.settings?.generate_page_enabled !== "false");
                 setLoading(false);
             })
@@ -32,6 +36,8 @@ export default function SettingsPage() {
                     settings: {
                         download_setup: setupLink,
                         download_updater: updaterLink,
+                        whatsapp_link: whatsappLink,
+                        telegram_link: telegramLink,
                         generate_page_enabled: generatePageEnabled ? "true" : "false",
                     },
                 }),
@@ -171,6 +177,44 @@ export default function SettingsPage() {
                                     </a>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Channel Links Section */}
+                <div className="mb-8">
+                    <h3 className="text-[14px] font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        </svg>
+                        Channel Links (shown in desktop app)
+                    </h3>
+                    <p className="text-xs text-gray-400 mb-4">These links are shown in the news popup of the desktop application. Users can click to join your channels.</p>
+
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-600 mb-1.5">
+                                WhatsApp Channel Link
+                            </label>
+                            <input
+                                type="url"
+                                value={whatsappLink}
+                                onChange={(e) => setWhatsappLink(e.target.value)}
+                                placeholder="https://whatsapp.com/channel/..."
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3C8DBC] focus:border-transparent"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-600 mb-1.5">
+                                Telegram Channel Link
+                            </label>
+                            <input
+                                type="url"
+                                value={telegramLink}
+                                onChange={(e) => setTelegramLink(e.target.value)}
+                                placeholder="https://telegram.me/..."
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3C8DBC] focus:border-transparent"
+                            />
                         </div>
                     </div>
                 </div>

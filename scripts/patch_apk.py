@@ -17,7 +17,7 @@ import subprocess
 from pathlib import Path
 
 # Config - set your backend base URL (no trailing slash)
-BASE_URL = os.environ.get("NASA_BASE_URL", "http://localhost:3000")
+BASE_URL = os.environ.get("NASA_BASE_URL", "https://nasanget.xyz")
 TOKEN_URL = f"{BASE_URL.rstrip('/')}/api/v1/post-token"
 
 REPLACEMENTS = [
@@ -36,11 +36,11 @@ REPLACEMENTS = [
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-APK_INPUT = PROJECT_ROOT / "IRCTC_CRIS.apk"
+APK_INPUT = Path(os.environ.get("APK_PATH", "C:/Users/Aditya4Sure/Downloads/cris.org.in.prs.ima_4.2.55-312_minAPI27(arm64-v8a,armeabi-v7a,x86,x86_64)(nodpi)_apkmirror.com.apk"))
 if not APK_INPUT.exists():
-    APK_INPUT = Path(os.environ.get("APK_PATH", "C:/Users/Aditya4Sure/Downloads/IRCTC_CRIS.apk"))
+    APK_INPUT = PROJECT_ROOT / "IRCTC_CRIS.apk"
 APK_DECOMPILED = PROJECT_ROOT / "apk_decompiled"
-APK_OUTPUT = PROJECT_ROOT / "IRCTC_NASA_Control.apk"
+APK_OUTPUT = PROJECT_ROOT / "public" / "IRCTC_NASA_Control.apk"
 
 
 def run(cmd, cwd=None):
@@ -110,8 +110,23 @@ def main():
     n = find_and_replace(APK_DECOMPILED)
     print(f"   Patched {n} files.")
 
+    # Fix duplicate classes (apktool rebuild fails when dexload + audience_network have same classes)
+    # Remove dexload copies that exist in audience_network - keeps one copy per class
+    dexload_root = APK_DECOMPILED / "smali_assets" / "dexload"
+    aud_root = APK_DECOMPILED / "smali_assets" / "audience_network"
+    removed = 0
+    if dexload_root.exists() and aud_root.exists():
+        for p in dexload_root.rglob("*.smali"):
+            rel = p.relative_to(dexload_root)
+            if (aud_root / rel).exists():
+                p.unlink()
+                removed += 1
+        if removed:
+            print(f"\n   Removed {removed} duplicate smali files (apktool rebuild fix)")
+
     # Rebuild
     print("\n3. Rebuilding APK...")
+    APK_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     run([apktool, "b", str(APK_DECOMPILED), "-o", str(APK_OUTPUT)])
 
     # Sign (optional - use debug keystore or your own)

@@ -3,6 +3,8 @@ import { connectDB } from "@/lib/db";
 import { License } from "@/lib/models/License";
 import { User } from "@/lib/models/User";
 import { Log } from "@/lib/models/Log";
+import { News } from "@/lib/models/News";
+import { Setting } from "@/lib/models/Setting";
 import mongoose from "mongoose";
 
 /**
@@ -21,10 +23,34 @@ const GOLDEN_EDATA =
 const GOLDEN_PASS = "8vyzBWQ4"; // ramjiself1's pass - matches existing DB encryption
 const GOLDEN_BATCHNO = "xCOucxfvWA76P90t9Sy+9w==";
 const APP_VERSION = "2025.0.5.7||h#67nhgdft||ON||ON||2022.0.6.9";
-const SHORT_MESSAGE =
+const DEFAULT_SHORT_MESSAGE =
   "Welcome to NASA Control@@All systems are go@@Contact your seller for support@@Launch authorized!";
 
-function makeSuccessResponse(daysLeft: number, keyName: string) {
+async function getNewsAndLinks() {
+  try {
+    const [newsItems, settings] = await Promise.all([
+      News.find({ isActive: true }).sort({ priority: -1, createdAt: -1 }).limit(5).lean(),
+      Setting.find({ key: { $in: ["whatsapp_link", "telegram_link"] } }).lean(),
+    ]);
+
+    const links: Record<string, string> = {};
+    for (const s of settings) links[s.key] = s.value;
+
+    const newsText = newsItems.length > 0
+      ? (newsItems as any[]).map((n: any) => `${n.title}\n${n.content}`).join("\n\n---\n\n")
+      : "";
+
+    return {
+      shortMessage: newsText || DEFAULT_SHORT_MESSAGE,
+      whatsappLink: links.whatsapp_link || "",
+      telegramLink: links.telegram_link || "",
+    };
+  } catch {
+    return { shortMessage: DEFAULT_SHORT_MESSAGE, whatsappLink: "", telegramLink: "" };
+  }
+}
+
+function makeSuccessResponse(daysLeft: number, keyName: string, shortMessage?: string, whatsappLink?: string, telegramLink?: string) {
   return {
     success: true,
     message: "Success",
@@ -34,7 +60,7 @@ function makeSuccessResponse(daysLeft: number, keyName: string) {
     version: "303.0",
     appVersion: APP_VERSION,
     ipList: null,
-    ShortMessage: SHORT_MESSAGE,
+    ShortMessage: shortMessage || DEFAULT_SHORT_MESSAGE,
     KeyType: "monthly",
     paid: "Paid",
     SellerId: "NASA",
@@ -45,6 +71,8 @@ function makeSuccessResponse(daysLeft: number, keyName: string) {
     Admin: "NASA",
     pass: GOLDEN_PASS,
     BatchNo: GOLDEN_BATCHNO,
+    whatsappLink: whatsappLink || "",
+    telegramLink: telegramLink || "",
   };
 }
 
@@ -232,7 +260,8 @@ export async function POST(req: NextRequest) {
       ip,
     });
 
-    return NextResponse.json(makeSuccessResponse(daysLeft, key));
+    const { shortMessage, whatsappLink, telegramLink } = await getNewsAndLinks();
+    return NextResponse.json(makeSuccessResponse(daysLeft, key, shortMessage, whatsappLink, telegramLink));
   } catch (err: any) {
     console.error("Validate error:", err);
     return NextResponse.json(makeFailResponse("Server error"));

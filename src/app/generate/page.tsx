@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function GeneratePublicPage() {
@@ -9,6 +9,17 @@ export default function GeneratePublicPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [accessEnabled, setAccessEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        const val = data.settings?.generate_page_enabled;
+        setAccessEnabled(val !== "false");
+      })
+      .catch(() => setAccessEnabled(true));
+  }, []);
 
   const generateKey = async () => {
     if (!keyInput.trim()) {
@@ -82,11 +93,27 @@ export default function GeneratePublicPage() {
 
         {/* Main card */}
         <div className="bg-[#111B33]/80 backdrop-blur-sm rounded-2xl border border-[#1C2B4A] p-8">
-          {!generatedKey ? (
+          {accessEnabled === false ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#FC3D21]/20 border border-[#FC3D21]/40 flex items-center justify-center">
+                <svg className="w-8 h-8 text-[#FC3D21]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-white mb-2">Generate Page Access Disabled</h2>
+              <p className="text-[#7B8FB5] text-sm">Key generation is currently disabled by the administrator.</p>
+              <Link href="/" className="inline-block mt-6 text-[#2B7AE8] hover:text-[#105BD8] text-sm font-medium transition">
+                Admin Login
+              </Link>
+            </div>
+          ) : accessEnabled === null ? (
+            <div className="py-12 flex justify-center">
+              <div className="w-8 h-8 border-2 border-[#1C2B4A] border-t-[#105BD8] rounded-full animate-spin" />
+            </div>
+          ) : !generatedKey ? (
             <>
               <p className="text-center text-[#7B8FB5] text-sm mb-6 leading-relaxed">
-                Enter a custom key name below. The <span className="text-[#2B7AE8] font-medium">NASA-</span> prefix
-                will be added automatically.
+                Enter a custom key name below. It will be used exactly as you type it.
               </p>
 
               {error && (
@@ -98,31 +125,28 @@ export default function GeneratePublicPage() {
               {/* Key input */}
               <div className="mb-5">
                 <div className="flex items-center bg-[#0B1026] border border-[#1C2B4A] rounded-xl overflow-hidden focus-within:border-[#105BD8]/50 transition">
-                  <span className="px-4 py-4 text-[#2B7AE8] font-mono font-bold text-lg bg-[#0B1026] select-none border-r border-[#1C2B4A]">
-                    NASA-
-                  </span>
                   <input
                     type="text"
                     value={keyInput}
                     onChange={(e) => {
-                      setKeyInput(e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, ""));
+                      setKeyInput(e.target.value);
                       setError("");
                     }}
                     onKeyDown={handleKeyDown}
-                    placeholder="YOUR-KEY-NAME"
-                    className="flex-1 bg-transparent px-4 py-4 text-white font-mono text-lg tracking-widest placeholder:text-[#3A4A6A] outline-none"
-                    maxLength={45}
+                    placeholder="Enter key name"
+                    className="flex-1 bg-transparent px-4 py-4 text-white font-mono text-lg tracking-wide placeholder:text-[#3A4A6A] outline-none"
+                    maxLength={100}
                     autoFocus
                   />
                 </div>
                 <p className="text-[#3A4A6A] text-xs mt-2 text-center">
-                  Min 6 characters. Letters, numbers, and dashes only.
+                  Whatever you type will be the key.
                 </p>
               </div>
 
               <button
                 onClick={generateKey}
-                disabled={loading || keyInput.trim().length < 6}
+                disabled={loading || !keyInput.trim()}
                 className="w-full py-4 bg-gradient-to-r from-[#105BD8] to-[#2B7AE8] hover:from-[#2B7AE8] hover:to-[#105BD8] text-white font-bold text-lg rounded-xl transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed tracking-wide shadow-lg shadow-[#105BD8]/25 hover:shadow-[#105BD8]/40 active:scale-[0.98]"
               >
                 {loading ? (

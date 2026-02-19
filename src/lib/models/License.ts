@@ -34,7 +34,7 @@ const LicenseSchema = new Schema<ILicense>({
   lastUsedAt: { type: Date, default: null },
   lastUsedIp: { type: String, default: null },
   notes: { type: String, default: "" },
-});
+}, { timestamps: true });
 
 export const License =
   mongoose.models.License ||

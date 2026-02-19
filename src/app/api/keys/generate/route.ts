@@ -1,35 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { License } from "@/lib/models/License";
+import { Setting } from "@/lib/models/Setting";
 
 // POST — public key generation (no auth, unlimited, custom key name)
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
 
-    const body = await req.json().catch(() => ({}));
-    const customKey = (body.key || "").trim().toUpperCase();
+    const genSetting = await Setting.findOne({ key: "generate_page_enabled" }).lean();
+    if (genSetting?.value === "false") {
+      return NextResponse.json(
+        { error: "Generate page access is currently disabled." },
+        { status: 403 }
+      );
+    }
 
-    if (!customKey) {
+    const body = await req.json().catch(() => ({}));
+    const finalKey = (body.key || "").trim();
+
+    if (!finalKey) {
       return NextResponse.json(
         { error: "Please enter a key name." },
         { status: 400 }
       );
     }
 
-    // Must be at least 6 chars so final key (NASA-XXXXXX) is > 10 chars
-    // which is required for the desktop app to detect it
-    if (customKey.length < 6 || customKey.length > 50) {
+    if (finalKey.length < 1 || finalKey.length > 100) {
       return NextResponse.json(
-        { error: "Key must be between 6 and 50 characters." },
+        { error: "Key must be between 1 and 100 characters." },
         { status: 400 }
       );
-    }
-
-    // Format the key: add NASA- prefix if not present
-    let finalKey = customKey;
-    if (!finalKey.startsWith("NASA-")) {
-      finalKey = "NASA-" + finalKey;
     }
 
     // Check if key already exists

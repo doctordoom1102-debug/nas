@@ -3,31 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --nasa-deep: #0B1026;
-  --nasa-mid: #111B33;
-  --nasa-light: #1C2B4A;
-  --nasa-blue: #105BD8;
-  --nasa-highlight: #2B7AE8;
-  --nasa-red: #FC3D21;
-  --nasa-text: #E8EDF5;
-  --nasa-sub: #7B8FB5;
-  --nasa-gold: #F0C030;
-  --nasa-cyan: #00B4D8;
+  --brand-blue: #4A90D9;
+  --brand-sidebar: #343A40;
+  --brand-bg: #F4F6F9;
 }
 
+/* Clean neutral base — no forced dark colors on inputs */
 body {
-  background-color: var(--nasa-deep);
-  color: var(--nasa-text);
+  background-color: var(--brand-bg);
+  color: #212529;
 }
 
-input, select, textarea {
-  background-color: var(--nasa-mid) !important;
-  border: 1px solid var(--nasa-light) !important;
-  color: var(--nasa-text) !important;
-}
-
-input:focus, select:focus, textarea:focus {
-  border-color: var(--nasa-blue) !important;
-  outline: none !important;
-  box-shadow: 0 0 0 2px rgba(16, 91, 216, 0.3) !important;
+/* Remove any browser autofill blue background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+select:-webkit-autofill,
+textarea:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #212529 !important;
 }

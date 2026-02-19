@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { License } from "@/lib/models/License";
+import { User } from "@/lib/models/User";
 import { Log } from "@/lib/models/Log";
+import mongoose from "mongoose";
 
 /**
  * POST /api/license/validate
@@ -25,8 +27,11 @@ const SHORT_MESSAGE =
 function makeSuccessResponse(daysLeft: number, keyName: string) {
   return {
     success: true,
-    message: null,
+    message: "Success",
     leftDays: daysLeft,
+    mac_address: "",
+    status: 1,
+    version: "303.0",
     appVersion: APP_VERSION,
     ipList: null,
     ShortMessage: SHORT_MESSAGE,
@@ -34,8 +39,8 @@ function makeSuccessResponse(daysLeft: number, keyName: string) {
     paid: "Paid",
     SellerId: "NASA",
     edata: GOLDEN_EDATA,
-    sdata: "0",
-    adata: "0",
+    sdata: "1",
+    adata: "1",
     SuperSeller: "NASA",
     Admin: "NASA",
     pass: GOLDEN_PASS,
@@ -70,7 +75,8 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const key = body.key || body.licenseKey || "";
-    const hwid = body.hwid || body.mac || "";
+    const hwid = body.hwid || body.mac || body.mac_address || "";
+    console.log("[VALIDATE] key=" + key + " hwid=" + hwid);
     const ip = getIp(req);
 
     if (!key) {
@@ -87,6 +93,58 @@ export async function POST(req: NextRequest) {
         details: "Key not found",
       });
       return NextResponse.json(makeFailResponse("Invalid license key"));
+    }
+
+    // Key Lock Check — deactivate if ANY user in the chain is DEACTIVATED or has dues PAST grace period
+    if (license.createdBy) {
+      let checkId = license.createdBy;
+      while (checkId) {
+        const parent = await User.findById(checkId).select("paymentDue dueSince role username createdBy isActive").lean();
+        if (!parent || parent.role === "master_admin") break;
+
+        // Check 1: Deactivation — instant key deactivation
+        if (parent.isActive === false) {
+          await Log.create({
+            licenseKey: key,
+            action: "validate_deactivated_parent",
+            hwid,
+            ip,
+            details: `Key deactivated because ${parent.role} (${parent.username}) is deactivated`,
+          });
+          return NextResponse.json(
+            makeFailResponse("KEY DEACTIVATED! This key is disabled because the seller's account has been deactivated. Please contact support.")
+          );
+        }
+
+        // Check 2: Dues past grace period
+        if (parent.paymentDue > 0 && parent.dueSince) {
+          const dueDate = new Date(parent.dueSince);
+          const startOfDueDay = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+          const now = new Date();
+          const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const daysDiff = Math.floor((startOfToday.getTime() - startOfDueDay.getTime()) / 86400000);
+
+          const pastGrace =
+            (parent.role === "seller" && daysDiff >= 1) ||
+            (parent.role === "super" && daysDiff >= 2) ||
+            (parent.role === "admin" && daysDiff >= 4);
+
+          if (pastGrace) {
+            await Log.create({
+              licenseKey: key,
+              action: "validate_locked_parent",
+              hwid,
+              ip,
+              details: `Key deactivated because ${parent.role} (${parent.username}) has ₹${parent.paymentDue} dues (${daysDiff} days overdue)`,
+            });
+            return NextResponse.json(
+              makeFailResponse("KEY DEACTIVATED! This key is temporarily disabled due to outstanding dues. Please contact your seller to reactivate.")
+            );
+          }
+        }
+
+        checkId = parent.createdBy;
+      }
     }
 
     // Check status

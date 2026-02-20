@@ -53,11 +53,14 @@ export async function GET(req: NextRequest) {
     filter.createdBy = { $in: creatorIds };
   }
 
+  const limitParam = searchParams.get("limit");
+  const queryLimit = limitParam ? Math.min(parseInt(limitParam) || 200, 2000) : 200;
+
   const keys = await License.find(filter)
     .populate("createdBy", "username role")
     .populate("approvedBy", "username role")
     .sort({ createdAt: -1 })
-    .limit(200)
+    .limit(queryLimit)
     .lean();
   const total = await License.countDocuments(filter);
 

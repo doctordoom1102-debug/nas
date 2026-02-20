@@ -6,6 +6,9 @@ export default function SettingsPage() {
     const [updaterLink, setUpdaterLink] = useState("");
     const [whatsappLink, setWhatsappLink] = useState("");
     const [telegramLink, setTelegramLink] = useState("");
+    const [appVersion, setAppVersion] = useState("303.0");
+    const [appZipUrl, setAppZipUrl] = useState("");
+    const [appKill, setAppKill] = useState(false);
     const [generatePageEnabled, setGeneratePageEnabled] = useState(true);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -19,6 +22,9 @@ export default function SettingsPage() {
                 setUpdaterLink(data.settings?.download_updater || "");
                 setWhatsappLink(data.settings?.whatsapp_link || "");
                 setTelegramLink(data.settings?.telegram_link || "");
+                setAppVersion(data.settings?.app_version || "303.0");
+                setAppZipUrl(data.settings?.app_zip_url || "");
+                setAppKill(data.settings?.app_kill === "true");
                 setGeneratePageEnabled(data.settings?.generate_page_enabled !== "false");
                 setLoading(false);
             })
@@ -30,7 +36,7 @@ export default function SettingsPage() {
         setMessage(null);
         try {
             const res = await fetch("/api/admin/settings", {
-                method: "PUT",
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     settings: {
@@ -38,6 +44,9 @@ export default function SettingsPage() {
                         download_updater: updaterLink,
                         whatsapp_link: whatsappLink,
                         telegram_link: telegramLink,
+                        app_version: appVersion,
+                        app_zip_url: appZipUrl,
+                        app_kill: appKill ? "true" : "false",
                         generate_page_enabled: generatePageEnabled ? "true" : "false",
                     },
                 }),
@@ -215,6 +224,63 @@ export default function SettingsPage() {
                                 placeholder="https://telegram.me/..."
                                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3C8DBC] focus:border-transparent"
                             />
+                        </div>
+                    </div>
+                </div>
+
+                {/* App Update Control */}
+                <div className="mb-8">
+                    <h3 className="text-[14px] font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Desktop App Update Control
+                    </h3>
+                    <p className="text-xs text-gray-400 mb-4">Control auto-updates for all running desktop applications. When you upload a new version, all EXEs will auto-update on next launch.</p>
+
+                    <div className="space-y-4">
+                        <div className="flex gap-4">
+                            <div className="flex-1">
+                                <label className="block text-sm font-semibold text-gray-600 mb-1.5">
+                                    Current App Version
+                                </label>
+                                <input
+                                    type="text"
+                                    value={appVersion}
+                                    onChange={(e) => setAppVersion(e.target.value)}
+                                    placeholder="303.0"
+                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3C8DBC] focus:border-transparent"
+                                />
+                                <p className="text-xs text-gray-400 mt-1">Increase this to trigger auto-update on all clients</p>
+                            </div>
+                            <div className="flex items-center gap-2 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setAppKill(!appKill)}
+                                    className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${appKill ? "bg-red-500" : "bg-gray-300"}`}
+                                >
+                                    <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition ${appKill ? "translate-x-5" : "translate-x-1"}`} />
+                                </button>
+                                <div>
+                                    <span className={`text-sm font-medium ${appKill ? "text-red-600" : "text-gray-700"}`}>
+                                        Kill Switch {appKill ? "ON" : "OFF"}
+                                    </span>
+                                    <p className="text-xs text-gray-400">Force-close all running EXEs on next check</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-600 mb-1.5">
+                                Update ZIP URL
+                            </label>
+                            <input
+                                type="url"
+                                value={appZipUrl}
+                                onChange={(e) => setAppZipUrl(e.target.value)}
+                                placeholder="https://example.com/NASAControl_v304.zip"
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3C8DBC] focus:border-transparent"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">Direct link to the update ZIP. Leave empty to disable auto-updates.</p>
                         </div>
                     </div>
                 </div>

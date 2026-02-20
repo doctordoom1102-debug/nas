@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface BookingItem {
   _id: string;
@@ -12,8 +12,8 @@ interface BookingItem {
   createdAt: string;
 }
 
-interface BookingFull extends BookingItem {
-  screenshot: string;
+interface BookingDetail extends BookingItem {
+  screenshot?: string;
 }
 
 export default function BookingsPage() {
@@ -22,259 +22,242 @@ export default function BookingsPage() {
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
-  const [viewing, setViewing] = useState<BookingFull | null>(null);
-  const [viewLoading, setViewLoading] = useState(false);
+  const [selected, setSelected] = useState<BookingDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const LIMIT = 20;
 
-  const fetchBookings = async (p = page) => {
+  const fetchBookings = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    params.set("page", String(p));
-    params.set("limit", "15");
-    if (search) params.set("search", search);
-
-    const res = await fetch(`/api/bookings?${params}`);
-    const data = await res.json();
-    setBookings(data.bookings || []);
-    setTotal(data.total || 0);
-    setPage(data.page || 1);
-    setPages(data.pages || 1);
+    try {
+      const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
+      if (search) params.set("search", search);
+      const res = await fetch(`/api/bookings?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBookings(data.bookings || []);
+        setTotal(data.total || 0);
+        setPages(data.pages || 1);
+      }
+    } catch {}
     setLoading(false);
-  };
+  }, [page, search]);
 
-  useEffect(() => {
-    fetchBookings();
-  }, []);
+  useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchBookings(1);
-  };
-
-  const viewScreenshot = async (id: string) => {
-    setViewLoading(true);
-    setViewing(null);
-    const res = await fetch(`/api/bookings/${id}`);
-    const data = await res.json();
-    if (data.booking) {
-      setViewing(data.booking);
-    }
-    setViewLoading(false);
-  };
-
-  const closeViewer = () => {
-    setViewing(null);
+  const viewDetail = async (id: string) => {
+    setLoadingDetail(true);
+    try {
+      const res = await fetch(`/api/bookings/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelected(data.booking);
+      }
+    } catch {}
+    setLoadingDetail(false);
   };
 
   const deleteBooking = async (id: string) => {
     if (!confirm("Delete this booking record?")) return;
-    await fetch(`/api/bookings/${id}`, { method: "DELETE" });
-    setViewing(null);
-    fetchBookings();
+    try {
+      await fetch(`/api/bookings/${id}`, { method: "DELETE" });
+      fetchBookings();
+      if (selected?._id === id) setSelected(null);
+    } catch {}
   };
 
-  const downloadScreenshot = (booking: BookingFull) => {
-    if (!booking.screenshot) return;
-    const link = document.createElement("a");
-    link.href = `data:image/png;base64,${booking.screenshot}`;
-    link.download = `booking_${booking.licenseKey}_${new Date(booking.createdAt).toISOString().slice(0, 10)}.png`;
-    link.click();
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    setSearch(searchInput);
   };
+
+  const isSuccess = (title: string) => title?.toLowerCase().includes("success");
 
   return (
-    <div>
+    <div className="p-6 max-w-[1400px] mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Booking Records</h1>
-        <span className="text-[#7B8FB5] text-sm">{total} captures</span>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Booking Records</h1>
+          <p className="text-sm text-gray-500 mt-1">{total} total bookings received from desktop clients</p>
+        </div>
+        <button
+          onClick={() => { setSearch(""); setSearchInput(""); setPage(1); }}
+          className="text-xs text-blue-600 hover:underline"
+        >
+          Reset filters
+        </button>
       </div>
 
       {/* Search */}
       <form onSubmit={handleSearch} className="flex gap-2 mb-4">
         <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by key, details, title..."
-          className="flex-1 px-4 py-2 rounded-lg text-sm bg-[#111B33] border border-[#1C2B4A] text-white placeholder-[#7B8FB5] focus:outline-none focus:border-[#105BD8]"
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search by license key, details, or status..."
+          className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
-        <button
-          type="submit"
-          className="px-4 py-2 bg-[#105BD8] text-white rounded-lg text-sm hover:bg-[#2B7AE8] transition"
-        >
+        <button type="submit" className="bg-[#337ab7] text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-[#286090] transition-colors">
           Search
         </button>
       </form>
 
-      {/* Bookings Table */}
-      <div className="bg-[#111B33] rounded-xl border border-[#1C2B4A] overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[#1C2B4A] text-[#7B8FB5]">
-              <th className="text-left p-3">License Key</th>
-              <th className="text-left p-3">HWID</th>
-              <th className="text-left p-3">Form</th>
-              <th className="text-left p-3">Details</th>
-              <th className="text-left p-3">Captured</th>
-              <th className="text-left p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={6} className="p-6 text-center text-[#7B8FB5]">
-                  Loading...
-                </td>
+      {/* Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">Status</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">License Key</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">Details</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">Time</th>
+                <th className="text-right px-4 py-3 font-semibold text-gray-600">Actions</th>
               </tr>
-            ) : bookings.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="p-6 text-center text-[#7B8FB5]">
-                  No booking records yet.
-                </td>
-              </tr>
-            ) : (
-              bookings.map((b) => (
-                <tr
-                  key={b._id}
-                  className="border-b border-[#1C2B4A]/50 hover:bg-[#1C2B4A]/30"
-                >
-                  <td className="p-3 font-mono text-xs text-[#2B7AE8] select-all">
-                    {b.licenseKey}
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={5} className="text-center py-10 text-gray-400">Loading...</td></tr>
+              ) : bookings.length === 0 ? (
+                <tr><td colSpan={5} className="text-center py-10 text-gray-400">No bookings found</td></tr>
+              ) : bookings.map((b) => (
+                <tr key={b._id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                      isSuccess(b.formTitle)
+                        ? "bg-green-100 text-green-700"
+                        : "bg-red-100 text-red-700"
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${isSuccess(b.formTitle) ? "bg-green-500" : "bg-red-500"}`}></span>
+                      {b.formTitle || "Unknown"}
+                    </span>
                   </td>
-                  <td className="p-3 font-mono text-xs text-[#7B8FB5]">
-                    {b.hwid ? b.hwid.substring(0, 12) + "..." : "---"}
-                  </td>
-                  <td className="p-3 text-white">
-                    <span className="text-xs">{b.formTitle || b.formName || "---"}</span>
-                  </td>
-                  <td className="p-3 text-[#7B8FB5] max-w-xs truncate text-xs">
-                    {b.details
-                      ? b.details.length > 80
-                        ? b.details.substring(0, 80) + "..."
-                        : b.details
-                      : "---"}
-                  </td>
-                  <td className="p-3 text-[#7B8FB5] text-xs whitespace-nowrap">
+                  <td className="px-4 py-3 font-mono text-xs text-gray-700">{b.licenseKey}</td>
+                  <td className="px-4 py-3 text-gray-600 max-w-[350px] truncate" title={b.details}>{b.details}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
                     {new Date(b.createdAt).toLocaleString()}
                   </td>
-                  <td className="p-3">
-                    <div className="flex gap-1">
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => viewScreenshot(b._id)}
-                        className="px-2 py-1 bg-[#105BD8]/20 text-[#2B7AE8] rounded text-xs hover:bg-[#105BD8]/30 transition"
+                        onClick={() => viewDetail(b._id)}
+                        className="text-blue-600 hover:text-blue-800 text-xs font-medium hover:underline"
                       >
                         View
                       </button>
                       <button
                         onClick={() => deleteBooking(b._id)}
-                        className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs hover:bg-red-500/30 transition"
+                        className="text-red-500 hover:text-red-700 text-xs font-medium hover:underline"
                       >
-                        Del
+                        Delete
                       </button>
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {pages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
+            <span className="text-xs text-gray-500">
+              Page {page} of {pages} ({total} total)
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page <= 1}
+                className="px-3 py-1 rounded border text-xs disabled:opacity-40 hover:bg-gray-100 transition-colors"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage(Math.min(pages, page + 1))}
+                disabled={page >= pages}
+                className="px-3 py-1 rounded border text-xs disabled:opacity-40 hover:bg-gray-100 transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Pagination */}
-      {pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button
-            onClick={() => fetchBookings(page - 1)}
-            disabled={page <= 1}
-            className="px-3 py-1.5 bg-[#111B33] border border-[#1C2B4A] text-[#7B8FB5] rounded-lg text-sm disabled:opacity-30 hover:bg-[#1C2B4A] transition"
-          >
-            Prev
-          </button>
-          <span className="text-[#7B8FB5] text-sm">
-            {page} / {pages}
-          </span>
-          <button
-            onClick={() => fetchBookings(page + 1)}
-            disabled={page >= pages}
-            className="px-3 py-1.5 bg-[#111B33] border border-[#1C2B4A] text-[#7B8FB5] rounded-lg text-sm disabled:opacity-30 hover:bg-[#1C2B4A] transition"
-          >
-            Next
-          </button>
-        </div>
-      )}
-
-      {/* Screenshot Viewer Modal */}
-      {(viewing || viewLoading) && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-6"
-          onClick={closeViewer}
-        >
-          <div
-            className="bg-[#111B33] border border-[#1C2B4A] rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {viewLoading ? (
-              <div className="p-12 text-center text-[#7B8FB5]">
-                Loading screenshot...
-              </div>
-            ) : viewing ? (
+      {/* Detail Modal */}
+      {(selected || loadingDetail) && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => !loadingDetail && setSelected(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {loadingDetail ? (
+              <div className="p-12 text-center text-gray-400">Loading booking details...</div>
+            ) : selected && (
               <>
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-[#1C2B4A]">
+                <div className="flex items-center justify-between p-5 border-b border-gray-200">
                   <div>
-                    <h2 className="text-lg font-bold text-white">
-                      Booking Screenshot
-                    </h2>
-                    <p className="text-xs text-[#7B8FB5] mt-0.5">
-                      Key: {viewing.licenseKey} &middot; HWID:{" "}
-                      {viewing.hwid || "N/A"} &middot;{" "}
-                      {new Date(viewing.createdAt).toLocaleString()}
-                    </p>
+                    <h2 className="text-lg font-bold text-gray-800">Booking Detail</h2>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold mt-1 ${
+                      isSuccess(selected.formTitle) ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                    }`}>
+                      {selected.formTitle}
+                    </span>
                   </div>
-                  <div className="flex gap-2">
-                    {viewing.screenshot && (
-                      <button
-                        onClick={() => downloadScreenshot(viewing)}
-                        className="px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg text-xs hover:bg-green-500/30 transition"
-                      >
-                        Download PNG
-                      </button>
-                    )}
-                    <button
-                      onClick={closeViewer}
-                      className="px-3 py-1.5 bg-[#1C2B4A] text-[#7B8FB5] rounded-lg text-xs hover:bg-[#2D3B5A] transition"
-                    >
-                      Close
-                    </button>
-                  </div>
+                  <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
                 </div>
-
-                {/* Details */}
-                {viewing.details && (
-                  <div className="p-4 border-b border-[#1C2B4A]">
-                    <p className="text-xs text-[#7B8FB5] mb-1 font-medium">
-                      Extracted Details
-                    </p>
-                    <pre className="text-sm text-white whitespace-pre-wrap font-mono bg-[#0B1026] p-3 rounded-lg">
-                      {viewing.details}
-                    </pre>
+                <div className="p-5 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase">License Key</label>
+                      <p className="font-mono text-sm text-gray-800 mt-0.5">{selected.licenseKey}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase">HWID</label>
+                      <p className="font-mono text-sm text-gray-800 mt-0.5 break-all">{selected.hwid}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase">Form</label>
+                      <p className="text-sm text-gray-800 mt-0.5">{selected.formName}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase">Received At</label>
+                      <p className="text-sm text-gray-800 mt-0.5">{new Date(selected.createdAt).toLocaleString()}</p>
+                    </div>
                   </div>
-                )}
-
-                {/* Screenshot Image */}
-                {viewing.screenshot ? (
-                  <div className="p-4">
-                    <img
-                      src={`data:image/png;base64,${viewing.screenshot}`}
-                      alt="Booking screenshot"
-                      className="w-full rounded-lg border border-[#1C2B4A]"
-                    />
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase">Details</label>
+                    <p className="text-sm text-gray-800 mt-0.5 bg-gray-50 rounded-lg p-3 border">{selected.details}</p>
                   </div>
-                ) : (
-                  <div className="p-8 text-center text-[#7B8FB5]">
-                    No screenshot available — only booking details were captured.
-                  </div>
-                )}
+                  {selected.screenshot && (
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase">Screenshot</label>
+                      <div className="mt-2 border rounded-lg overflow-hidden bg-gray-900">
+                        <img
+                          src={selected.screenshot.startsWith("data:") ? selected.screenshot : `data:image/png;base64,${selected.screenshot}`}
+                          alt="Booking screenshot"
+                          className="w-full h-auto"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-3 p-5 border-t border-gray-200">
+                  <button
+                    onClick={() => deleteBooking(selected._id)}
+                    className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setSelected(null)}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
               </>
-            ) : null}
+            )}
           </div>
         </div>
       )}

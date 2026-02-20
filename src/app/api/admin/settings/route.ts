@@ -16,8 +16,8 @@ export async function GET() {
     return NextResponse.json({ settings: result });
 }
 
-// PUT /api/admin/settings — update settings (master_admin only)
-export async function PUT(req: NextRequest) {
+// POST /api/admin/settings — update settings (master_admin only)
+export async function POST(req: NextRequest) {
     const session = await getSession();
     if (!session || session.role !== "master_admin") {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });

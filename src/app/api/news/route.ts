@@ -30,7 +30,7 @@ export async function GET() {
                 content: n.content,
                 date: n.createdAt,
             })),
-            whatsapp_link: links.whatsapp_link || "https://whatsapp.com/channel/0029VaEdaFnC6ZvnfU0QD91O",
+            whatsapp_link: links.whatsapp_link || "https://whatsapp.com/channel/0029Vb7qq7ZElagvIZ8YGd2s",
             telegram_link: links.telegram_link || "https://telegram.me/NASAControl",
         });
     } catch (err) {

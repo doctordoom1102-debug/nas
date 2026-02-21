@@ -12,6 +12,7 @@ export default function SettingsPage() {
     const [generatePageEnabled, setGeneratePageEnabled] = useState(true);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
     useEffect(() => {
@@ -273,14 +274,54 @@ export default function SettingsPage() {
                             <label className="block text-sm font-semibold text-gray-600 mb-1.5">
                                 Update ZIP URL
                             </label>
-                            <input
-                                type="url"
-                                value={appZipUrl}
-                                onChange={(e) => setAppZipUrl(e.target.value)}
-                                placeholder="https://example.com/NASAControl_v304.zip"
-                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3C8DBC] focus:border-transparent"
-                            />
-                            <p className="text-xs text-gray-400 mt-1">Direct link to the update ZIP. Leave empty to disable auto-updates.</p>
+                            <div className="flex gap-2">
+                                <input
+                                    type="url"
+                                    value={appZipUrl}
+                                    onChange={(e) => setAppZipUrl(e.target.value)}
+                                    placeholder="https://example.com/NASAControl_v304.zip"
+                                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3C8DBC] focus:border-transparent"
+                                />
+                                <label className={`px-4 py-2.5 rounded-lg text-sm font-semibold cursor-pointer transition-colors flex items-center gap-2 ${uploading ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>
+                                    {uploading ? (
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                        </svg>
+                                    )}
+                                    Upload ZIP
+                                    <input
+                                        type="file"
+                                        accept=".zip"
+                                        className="hidden"
+                                        disabled={uploading}
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            setUploading(true);
+                                            setMessage(null);
+                                            try {
+                                                const fd = new FormData();
+                                                fd.append("file", file);
+                                                const res = await fetch("/api/updates/upload", { method: "POST", body: fd });
+                                                const data = await res.json();
+                                                if (data.success) {
+                                                    setAppZipUrl(data.url);
+                                                    setMessage({ text: `ZIP uploaded (${(data.size / 1024 / 1024).toFixed(1)} MB). URL auto-filled. Don't forget to bump the version and save!`, type: "success" });
+                                                } else {
+                                                    setMessage({ text: data.error || "Upload failed", type: "error" });
+                                                }
+                                            } catch {
+                                                setMessage({ text: "Upload failed", type: "error" });
+                                            }
+                                            setUploading(false);
+                                            e.target.value = "";
+                                        }}
+                                    />
+                                </label>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1">Upload a ZIP directly or paste a URL. Leave empty to disable auto-updates.</p>
                         </div>
                     </div>
                 </div>

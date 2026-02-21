@@ -20,16 +20,20 @@ export async function POST(req: NextRequest) {
     await mkdir(UPLOADS_DIR, { recursive: true });
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const filePath = path.join(UPLOADS_DIR, "WinZip.zip");
+    const saveName = file.name === "WinZip.zip" ? "WinZip.zip" : file.name;
+    const filePath = path.join(UPLOADS_DIR, saveName);
     await writeFile(filePath, buffer);
 
     const host = req.headers.get("host") || "nasanget.xyz";
     const protocol = req.headers.get("x-forwarded-proto") || "https";
-    const downloadUrl = `${protocol}://${host}/api/updates/download`;
+    const downloadUrl = saveName === "WinZip.zip"
+        ? `${protocol}://${host}/api/updates/download`
+        : `${protocol}://${host}/api/updates/files/${saveName}`;
 
     return NextResponse.json({
         success: true,
         url: downloadUrl,
+        filename: saveName,
         size: buffer.length,
     });
 }

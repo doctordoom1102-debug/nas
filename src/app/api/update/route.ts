@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { Setting } from "@/lib/models/Setting";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/update
  * Called by the desktop EXE on startup to check for updates.
